@@ -7,9 +7,6 @@ import cobra.mit.session
 import cobra.mit.access
 from requests.packages.urllib3 import disable_warnings
 
-__author__ = 'tigarner'
-__email__ = 'tigarner@cisco.com'
-
 disable_warnings()
 app = Flask(__name__, template_folder="templates")
 
