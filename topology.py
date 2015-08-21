@@ -8,7 +8,7 @@ import cobra.mit.access
 from requests.packages.urllib3 import disable_warnings
 
 disable_warnings()
-app = Flask(__name__, template_folder="templates")
+app = Flask(__name__, template_folder="")
 
 class Leaf(object):
     def __init__(self,id, name):
