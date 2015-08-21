@@ -1,0 +1,198 @@
+<html>
+<head>
+    <title>ACI Topology</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.0.0-alpha1/jquery.js"></script>
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/css/bootstrap-theme.min.css">
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/js/bootstrap.min.js"></script>
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.4.0/css/font-awesome.min.css">
+</head>
+<body>
+<div class="container" style="padding-top: 10px">
+    <div class="row">
+        <div class="col-md-8">
+            <div class="panel panel-default">
+                <div class="panel-heading">
+                    <i class="fa fa-sitemap fa-fw"></i> Topology
+                </div>
+
+                <div class="panel-body">
+                    <span style="display: inline-block; width: 10px; height: 10px; background: rgb(31, 119, 180)"></span>
+                    =
+                    Leaf
+                    <span style="display: inline-block; width: 10px; height: 10px; background: rgb(255, 187, 120)"></span>
+                    =
+                    VMM
+                    <span style="display: inline-block; width: 10px; height: 10px; background: rgb(174, 199, 232)"></span>
+                    = Spine
+                    <span style="display: inline-block; width: 10px; height: 10px; background: rgb(255, 127, 14)"></span>
+                    = FEX
+                    <div class="col-md-2 col-md-offset-2">
+                    <div id="spinner">
+                        <i class="fa fa-spinner fa-5x fa-spin"></i>
+                    </div>
+                    </div>
+                    <div id="diagram">
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="panel panel-default">
+                <div class="panel-heading">
+                    <i class="fa fa-sitemap fa-fw"></i> Device Details:
+                </div>
+                <div class="panel-body"><h3><span id="name"></span></h3>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<style type="text/css">
+
+    .node {
+        stroke: #fff;
+        stroke-width: 2px;
+    }
+
+    .link {
+        stroke: #999;
+        stroke-opacity: .6;
+    }
+
+    .node text {
+        pointer-events: none;
+        font: 10px sans-serif;
+    }
+
+
+</style>
+<script src="http://d3js.org/d3.v3.min.js"></script>
+<script type="text/javascript">
+
+
+    var width = 1000,
+            height = 900;
+
+    var color = d3.scale.category20();
+
+    var force = d3.layout.force()
+            .charge(-1000)
+            .linkDistance(150)
+            .gravity(0.1)
+            .size([width, height]);
+
+    var svg = d3.select("#diagram").append("svg")
+            .attr("width", width)
+            .attr("height", height);
+
+    d3.json("topology.json/", function (error, graph) {
+        force
+                .nodes(graph.nodes)
+                .links(graph.links)
+                .start();
+
+        var link = svg.selectAll(".link")
+                .data(graph.links)
+                .enter().append("line")
+                .attr("class", "link")
+                .style("stroke-width", function (d) {
+                    return Math.sqrt(d.value);
+                });
+
+        var gnodes = svg.selectAll(".node")
+                .data(graph.nodes)
+                .enter().append('g').classed('gnode', true);
+
+
+        var node = gnodes.append("circle")
+                .attr("class", "node")
+                .attr("r", 15)
+                .style("fill", function (d) {
+                    return color(d.group);
+                })
+                .call(force.drag)
+                .on('dblclick', connectedNodes) //Added code
+                .on('click', selectNode); //Added code
+
+
+        node.append("title")
+                .text(function (d) {
+                    return d.name;
+                });
+
+        var labels = gnodes.append("text")
+                .attr("dx", 10)
+                .attr("dy", -10)
+                .text(function (d) {
+                    return d.name;
+                });
+
+        force.on("tick", function () {
+            link.attr("x1", function (d) {
+                return d.source.x;
+            })
+                    .attr("y1", function (d) {
+                        return d.source.y;
+                    })
+                    .attr("x2", function (d) {
+                        return d.target.x;
+                    })
+                    .attr("y2", function (d) {
+                        return d.target.y;
+                    });
+
+            gnodes.attr("transform", function (d) {
+                return 'translate(' + [d.x, d.y] + ')';
+            });
+
+        });
+        //Toggle stores whether the highlighting is on
+        var toggle = 0;
+        //Create an array logging what is connected to what
+        var linkedByIndex = {};
+        for (i = 0; i < graph.nodes.length; i++) {
+            linkedByIndex[i + "," + i] = 1;
+        }
+        ;
+        graph.links.forEach(function (d) {
+            linkedByIndex[d.source.index + "," + d.target.index] = 1;
+        });
+        //This function looks up whether a pair are neighbours
+        function neighboring(a, b) {
+            return linkedByIndex[a.index + "," + b.index];
+        }
+
+        function connectedNodes() {
+            if (toggle == 0) {
+                //Reduce the opacity of all but the neighbouring nodes
+                d = d3.select(this).node().__data__;
+                node.style("opacity", function (o) {
+                    return neighboring(d, o) | neighboring(o, d) ? 1 : 0.1;
+                });
+                link.style("opacity", function (o) {
+                    return d.index == o.source.index | d.index == o.target.index ? 1 : 0.1;
+                });
+                //Reduce the op
+                toggle = 1;
+            } else {
+                //Put them back to opacity=1
+                node.style("opacity", 1);
+                link.style("opacity", 1);
+                toggle = 0;
+            }
+        }
+
+        function selectNode() {
+            d = d3.select(this).node().__data__;
+            console.log(d);
+            $('#name').html(d.name);
+        }
+
+        $('#spinner').hide();
+    });
+
+
+</script>
+</body>
+</html>
